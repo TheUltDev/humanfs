@@ -28,8 +28,8 @@ import {
 //-----------------------------------------------------------------------------
 
 /**
- * Finds a file or directory in the OPFS root.
- * @param {FileSystemDirectoryHandle} root The root directory to search.
+ * Finds a file or directory in the FastIO workspace.
+ * @param {string} workspace The workspace to search.
  * @param {string|URL} fileOrDirPath The path to the file or directory to find.
  * @param {object} [options] The options for finding.
  * @param {boolean} [options.returnParent] True if the parent directory should be
@@ -40,7 +40,7 @@ import {
  * @returns {Promise<FileSystemHandle|undefined>} The file or directory found.
  */
 async function findPath(
-	root,
+	workspace,
 	fileOrDirPath,
 	{ returnParent = false, create = false, kind } = {},
 ) {
@@ -56,7 +56,7 @@ async function findPath(
 		steps.pop();
 	}
 
-	let handle = root;
+	let handle = workspace;
 	let name = steps.shift();
 
 	while (handle && name) {
@@ -105,7 +105,7 @@ async function findPath(
 
 /**
  * Reads a file from the specified root.
- * @param {FileSystemDirectoryHandle} root The root directory to search.
+ * @param {string} root The root directory to search.
  * @param {string|URL} filePath The path to the file to read.
  * @param {"text"|"arrayBuffer"} dataType The type of data to read.
  * @returns {Promise<string|ArrayBuffer|undefined>} The contents of the file or
@@ -138,23 +138,23 @@ async function readFile(root, filePath, dataType) {
  */
 export class FastHfsImpl {
 	/**
-	 * The root directory to work on.
-	 * @type {FileSystemDirectoryHandle}
+	 * The workspace to target.
+	 * @type {string}
 	 */
-	#root;
+	#workspace;
 
 	/**
 	 * Creates a new instance.
 	 * @param {object} options The options for the instance.
-	 * @param {FileSystemDirectoryHandle} options.root The root directory to work on.
-	 * @throws {TypeError} If options.root is not provided.
+	 * @param {string} options.workspace The workspace to target.
+	 * @throws {TypeError} If options.workspace is not provided.
 	 */
-	constructor({ root }) {
-		if (!root) {
-			throw new TypeError("options.root is required");
+	constructor({ workspace }) {
+		if (!workspace) {
+			throw new TypeError("options.workspace is required");
 		}
 
-		this.#root = root;
+		this.#workspace = workspace;
 	}
 
 	/**
@@ -167,7 +167,7 @@ export class FastHfsImpl {
 	 */
 	async bytes(filePath) {
 		const buffer = /** @type {ArrayBuffer|undefined} */ (
-			await readFile(this.#root, filePath, "arrayBuffer")
+			await readFile(this.#workspace, filePath, "arrayBuffer")
 		);
 		return buffer ? new Uint8Array(buffer) : undefined;
 	}
@@ -184,20 +184,20 @@ export class FastHfsImpl {
 	 */
 	async write(filePath, contents) {
 		let handle = /** @type {FileSystemFileHandle} */ (
-			await findPath(this.#root, filePath)
+			await findPath(this.#workspace, filePath)
 		);
 
 		if (!handle) {
 			const path = Path.from(filePath);
 			const name = path.name;
 			const parentHandle =
-				/** @type {FileSystemDirectoryHandle} */ (
-					await findPath(this.#root, filePath, {
+				/** @type {string} */ (
+					await findPath(this.#workspace, filePath, {
 						create: true,
 						kind: "directory",
 						returnParent: true,
 					})
-				) ?? this.#root;
+				) ?? this.#workspace;
 			handle = await parentHandle.getFileHandle(name, { create: true });
 		}
 
@@ -218,7 +218,7 @@ export class FastHfsImpl {
 	 */
 	async append(filePath, contents) {
 		const handle = /** @type {FileSystemFileHandle} */ (
-			await findPath(this.#root, filePath)
+			await findPath(this.#workspace, filePath)
 		);
 
 		// if there's no existing file, just write the contents
@@ -248,7 +248,7 @@ export class FastHfsImpl {
 	 * @throws {TypeError} If the file path is not a string.
 	 */
 	async isFile(filePath) {
-		const handle = await findPath(this.#root, filePath);
+		const handle = await findPath(this.#workspace, filePath);
 		return !!(handle && handle.kind === "file");
 	}
 
@@ -260,7 +260,7 @@ export class FastHfsImpl {
 	 * @throws {TypeError} If the directory path is not a string.
 	 */
 	async isDirectory(dirPath) {
-		const handle = await findPath(this.#root, dirPath);
+		const handle = await findPath(this.#workspace, dirPath);
 		return !!(handle && handle.kind === "directory");
 	}
 
@@ -271,7 +271,7 @@ export class FastHfsImpl {
 	 *   created.
 	 */
 	async createDirectory(dirPath) {
-		let handle = this.#root;
+		let handle = this.#workspace;
 		const path = Path.from(dirPath);
 
 		for (const name of path) {
@@ -290,13 +290,13 @@ export class FastHfsImpl {
 	 * @throws {Error} If the file or directory is not found.
 	 */
 	async delete(fileOrDirPath) {
-		const handle = await findPath(this.#root, fileOrDirPath);
+		const handle = await findPath(this.#workspace, fileOrDirPath);
 		const parentHandle =
-			/** @type {FileSystemDirectoryHandle} */ (
-				await findPath(this.#root, fileOrDirPath, {
+			/** @type {string} */ (
+				await findPath(this.#workspace, fileOrDirPath, {
 					returnParent: true,
 				})
-			) ?? this.#root;
+			) ?? this.#workspace;
 
 		if (!handle) {
 			throw new NotFoundError(`delete '${fileOrDirPath}'`);
@@ -326,7 +326,7 @@ export class FastHfsImpl {
 	 * @throws {Error} If the file or directory is not found.
 	 */
 	async deleteAll(fileOrDirPath) {
-		const handle = await findPath(this.#root, fileOrDirPath);
+		const handle = await findPath(this.#workspace, fileOrDirPath);
 
 		if (!handle) {
 			throw new NotFoundError(`deleteAll '${fileOrDirPath}'`);
@@ -334,7 +334,7 @@ export class FastHfsImpl {
 
 		/*
 		 * Note: For some reason, Chromium is not respecting the
-		 * `recursive` option on `FileSystemDirectoryHandle.removeEntry()`.
+		 * `recursive` option on `string.removeEntry()`.
 		 * I've been unable to come up with a minimal repro case to demonstrate.
 		 * Need to investigate further.
 		 * https://bugs.chromium.org/p/chromium/issues/detail?id=1521975
@@ -348,11 +348,11 @@ export class FastHfsImpl {
 		}
 
 		const parentHandle =
-			/** @type {FileSystemDirectoryHandle} */ (
-				await findPath(this.#root, fileOrDirPath, {
+			/** @type {string} */ (
+				await findPath(this.#workspace, fileOrDirPath, {
 					returnParent: true,
 				})
-			) ?? this.#root;
+			) ?? this.#workspace;
 
 		if (!handle) {
 			throw new NotFoundError(`deleteAll '${fileOrDirPath}'`);
@@ -367,8 +367,8 @@ export class FastHfsImpl {
 	 *   directory entries.
 	 */
 	async *list(dirPath) {
-		const handle = /** @type {FileSystemDirectoryHandle} */ (
-			await findPath(this.#root, dirPath)
+		const handle = /** @type {string} */ (
+			await findPath(this.#workspace, dirPath)
 		);
 
 		if (!handle) {
@@ -396,7 +396,7 @@ export class FastHfsImpl {
 	 *  file in bytes or undefined if the file doesn't exist.
 	 */
 	async size(filePath) {
-		const handle = await findPath(this.#root, filePath);
+		const handle = await findPath(this.#workspace, filePath);
 
 		if (!handle || handle.kind !== "file") {
 			return undefined;
@@ -415,7 +415,7 @@ export class FastHfsImpl {
 	 * date of the file or directory, or undefined if the file doesn't exist.
 	 */
 	async lastModified(fileOrDirPath) {
-		const handle = await findPath(this.#root, fileOrDirPath);
+		const handle = await findPath(this.#workspace, fileOrDirPath);
 
 		if (!handle) {
 			return undefined;
@@ -461,7 +461,7 @@ export class FastHfsImpl {
 	 */
 	async copy(source, destination) {
 		const fromHandle = /** @type {FileSystemFileHandle } */ (
-			await findPath(this.#root, source)
+			await findPath(this.#workspace, source)
 		);
 
 		if (!fromHandle) {
@@ -477,7 +477,7 @@ export class FastHfsImpl {
 		}
 
 		const toHandle = /** @type {FileSystemFileHandle } */ (
-			await findPath(this.#root, destination, {
+			await findPath(this.#workspace, destination, {
 				create: true,
 				kind: "file",
 			})
@@ -544,7 +544,7 @@ export class FastHfsImpl {
 	 * @throws {Error} If the file cannot be moved.
 	 */
 	async move(source, destination) {
-		const handle = await findPath(this.#root, source);
+		const handle = await findPath(this.#workspace, source);
 
 		if (!handle) {
 			throw new NotFoundError(`move '${source}' -> '${destination}'`);
@@ -558,7 +558,7 @@ export class FastHfsImpl {
 		const destinationPath = Path.from(destination);
 		const destinationName = destinationPath.pop();
 		const destinationParent = await findPath(
-			this.#root,
+			this.#workspace,
 			destinationPath.toString(),
 			{ create: true, kind: "directory" },
 		);
@@ -589,7 +589,7 @@ export class FastHfsImpl {
 	 * @throws {Error} If the source file or directory does not exist.
 	 */
 	async moveAll(source, destination) {
-		const handle = await findPath(this.#root, source);
+		const handle = await findPath(this.#workspace, source);
 
 		// if the source doesn't exist then throw an error
 		if (!handle) {
@@ -601,7 +601,7 @@ export class FastHfsImpl {
 			return this.move(source, destination);
 		}
 
-		const directoryHandle = /** @type {FileSystemDirectoryHandle} */ (
+		const directoryHandle = /** @type {string} */ (
 			handle
 		);
 		const destinationPath = Path.from(destination);
@@ -611,7 +611,7 @@ export class FastHfsImpl {
 		if (directoryHandle.move) {
 			const destinationName = destinationPath.pop();
 			const destinationParent = await findPath(
-				this.#root,
+				this.#workspace,
 				destinationPath.toString(),
 				{ create: true, kind: "directory" },
 			);
@@ -657,11 +657,13 @@ export class FastHfs extends Hfs {
 	/**
 	 * Creates a new instance.
 	 * @param {object} options The options for the instance.
-	 * @param {FileSystemDirectoryHandle} options.root The root directory to work on.
+	 * @param {string} options.workspace The workspace to target.
 	 */
-	constructor({ root }) {
-		super({ impl: new FastHfsImpl({ root }) });
+	constructor({ workspace }) {
+		super({ impl: new FastHfsImpl({ workspace }) });
 	}
 }
 
-export const hfs = new FastHfs({ root: await navigator.storage.getDirectory() });
+export const hfs = new FastHfs({
+	workspace: ''
+});
