@@ -1,5 +1,5 @@
 {
-  "name": "@humanfs/fastio",
+  "name": "fastio-fs",
   "version": "0.1.0",
   "description": "The FastIO bindings for the hfs library.",
   "type": "module",

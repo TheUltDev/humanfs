@@ -1,4 +1,4 @@
-# `@humanfs/fastio`
+# `fastio-fs`
 
 by [MediaFire](https://mediafire.com)
 
@@ -16,13 +16,13 @@ The humanfs bindings for the [Fast.io](https://fast.io) collaborative cloud stor
 It's recommended to import the minified version to save bandwidth:
 
 ```js
-import { hfs } from "https://cdn.skypack.dev/@humanfs/fastio?min";
+import { hfs } from "https://cdn.skypack.dev/fastio-fs?min";
 ```
 
 However, you can also import the unminified version for debugging purposes:
 
 ```js
-import { hfs } from "https://cdn.skypack.dev/@humanfs/fastio";
+import { hfs } from "https://cdn.skypack.dev/fastio-fs";
 ```
 
 ## Usage
@@ -30,7 +30,7 @@ import { hfs } from "https://cdn.skypack.dev/@humanfs/fastio";
 The easiest way to use hfs in your project is to import the `hfs` object:
 
 ```js
-import { hfs } from "@humanfs/fastio";
+import { hfs } from "fastio-fs";
 ```
 
 Then, you can use the API methods:
@@ -104,20 +104,20 @@ await hfs.deleteAll("dir");
 If you'd like to create your own instance, import the `FastHfs` constructor:
 
 ```js
-import { FastHfs } from "@humanfs/fastio";
+import { FastHfs } from "fastio-fs";
 
 const hfs = new FastHfs({
-	root: await navigator.storage.getDirectory()
+	workspaceId: '4696910076313161000'
 });
 ```
 
 If you'd like to use just the impl, import the `FastHfsImpl` constructor:
 
 ```js
-import { FastHfsImpl } from "@humanfs/fastio";
+import { FastHfsImpl } from "fastio-fs";
 
 const hfs = new FastHfsImpl({
-	root: await navigator.storage.getDirectory()
+	workspaceId: '4696910076313161000'
 });
 ```
 

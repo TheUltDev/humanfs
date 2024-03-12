@@ -1,0 +1,43 @@
+{
+  "name": "fastio-types",
+  "version": "0.1.0",
+  "description": "The TypeScript types for the FastIO FileSystem.",
+  "type": "module",
+  "types": "src/fastio-types.ts",
+  "exports": {
+    ".": {
+      "types": "./src/fastio-types.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MediaFire/humanfs.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "filesystem",
+    "fs",
+    "hfs",
+    "fastio",
+    "files"
+  ],
+  "author": "MediaFire",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/MediaFire/humanfs/issues"
+  },
+  "homepage": "https://github.com/MediaFire/humanfs#readme",
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2"
+  }
+}
