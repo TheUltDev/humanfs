@@ -23,7 +23,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/humanwhocodes/humanfs.git"
+    "url": "git+https://github.com/MediaFire/humanfs.git"
   },
   "publishConfig": {
     "access": "public"
@@ -38,24 +38,25 @@
   "author": "MediaFire",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/humanwhocodes/humanfs/issues"
+    "url": "https://github.com/MediaFire/humanfs/issues"
   },
-  "homepage": "https://github.com/humanwhocodes/humanfs#readme",
+  "homepage": "https://github.com/MediaFire/humanfs#readme",
   "engines": {
     "node": ">=18.18.0"
   },
   "devDependencies": {
+    "@humanfs/test": "^0.13.0",
+    "@humanfs/types": "^0.12.0",
     "@wdio/browser-runner": "^8.29.1",
     "@wdio/cli": "^8.29.1",
     "@wdio/mocha-framework": "^8.29.1",
     "@wdio/spec-reporter": "^8.29.1",
     "chai": "^5.0.0",
-    "@humanfs/test": "^0.13.0",
-    "@humanfs/types": "^0.12.0",
     "mocha": "^10.2.0",
     "typescript": "^5.2.2"
   },
   "dependencies": {
-    "@humanfs/core": "^0.15.0"
+    "@humanfs/core": "^0.15.0",
+    "wretch": "^2.8.1"
   }
 }
