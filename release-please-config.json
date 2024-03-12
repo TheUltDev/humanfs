@@ -12,6 +12,9 @@
     "packages/deno": {
       "release-type": "node"
     },
+    "packages/fastio": {
+      "release-type": "node"
+    },
     "packages/memory": {
       "release-type": "node"
     },

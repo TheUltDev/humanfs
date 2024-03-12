@@ -4,6 +4,7 @@
   "packages/core": "0.15.0",
   "packages/node": "0.14.1",
   "packages/deno": "0.14.0",
+  "packages/fastio": "0.1.0",
   "packages/memory": "0.15.0",
   "packages/web": "0.11.0"
 }

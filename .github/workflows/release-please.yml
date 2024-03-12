@@ -65,6 +65,12 @@ jobs:
               env:
                   NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
 
+            - name: Publish @humanfs/fastio package to npm
+              run: npm publish -w packages/fastio
+              if: ${{ steps.release.outputs['packages/fastio--release_created'] }}
+              env:
+                  NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+
             - name: Publish @humanfs/types package to npm
               run: npm publish -w packages/types
               if: ${{ steps.release.outputs['packages/types--release_created'] }}
