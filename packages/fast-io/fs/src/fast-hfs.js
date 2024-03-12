@@ -35,17 +35,13 @@ import wretch from "wretch";
  * @param {string} workspaceId The workspace to search.
  * @param {string} opaqueId The path to the file or directory to find.
  * @param {object} [options] The options for finding.
- * @param {boolean} [options.returnParent] True if the parent directory should be
- *  returned instead of the file or directory.
- * @param {boolean} [options.create] True if the file or directory should be
- *  created if it doesn't exist.
  * @param {"file"|"directory"} [options.kind] The kind of file or directory to find.
  * @returns {Promise<FastFileDetails|undefined>} The file or directory found.
  */
 async function getDetails(
 	workspaceId,
 	opaqueId,
-	{ returnParent = false, create = false, kind } = {},
+	{ kind } = {},
 ) {
 	// Special case: "root" targets the workspace root directory
 	if (opaqueId === "root") {
@@ -55,10 +51,6 @@ async function getDetails(
 	const path = Path.from(opaqueId);
 	const steps = [...path];
 
-	if (returnParent) {
-		steps.pop();
-	}
-
 	let handle = workspaceId;
 	let name = steps.shift();
 
@@ -66,17 +58,17 @@ async function getDetails(
 		// `name` must represent a directory
 		if (steps.length > 0) {
 			try {
-				handle = await handle.getDirectoryHandle(name, { create });
+				handle = await handle.getDirectoryHandle(name);
 			} catch {
 				return undefined;
 			}
 		} else {
 			if (!kind) {
 				try {
-					return await handle.getDirectoryHandle(name, { create });
+					return await handle.getDirectoryHandle(name);
 				} catch {
 					try {
-						return await handle.getFileHandle(name, { create });
+						return await handle.getFileHandle(name);
 					} catch {
 						return undefined;
 					}
@@ -85,7 +77,7 @@ async function getDetails(
 
 			if (kind === "directory") {
 				try {
-					return await handle.getDirectoryHandle(name, { create });
+					return await handle.getDirectoryHandle(name);
 				} catch {
 					return undefined;
 				}
@@ -93,7 +85,7 @@ async function getDetails(
 
 			if (kind === "file") {
 				try {
-					return await handle.getFileHandle(name, { create });
+					return await handle.getFileHandle(name);
 				} catch {
 					return undefined;
 				}
@@ -196,9 +188,7 @@ export class FastHfsImpl {
 			const parentHandle =
 				/** @type {string} */ (
 					await getDetails(this.#workspaceId, filePath, {
-						create: true,
 						kind: "directory",
-						returnParent: true,
 					})
 				) ?? this.#workspaceId;
 			handle = await parentHandle.getFileHandle(name, { create: true });
@@ -296,9 +286,7 @@ export class FastHfsImpl {
 		const handle = await getDetails(this.#workspaceId, opaqueId);
 		const parentHandle =
 			/** @type {string} */ (
-				await getDetails(this.#workspaceId, opaqueId, {
-					returnParent: true,
-				})
+				await getDetails(this.#workspaceId, opaqueId)
 			) ?? this.#workspaceId;
 
 		if (!handle) {
@@ -352,9 +340,7 @@ export class FastHfsImpl {
 
 		const parentHandle =
 			/** @type {string} */ (
-				await getDetails(this.#workspaceId, opaqueId, {
-					returnParent: true,
-				})
+				await getDetails(this.#workspaceId, opaqueId)
 			) ?? this.#workspaceId;
 
 		if (!handle) {
@@ -480,10 +466,7 @@ export class FastHfsImpl {
 		}
 
 		const toHandle = /** @type {FileSystemFileHandle } */ (
-			await getDetails(this.#workspaceId, destination, {
-				create: true,
-				kind: "file",
-			})
+			await getDetails(this.#workspaceId, destination, {kind: "file"})
 		);
 		const file = await fromHandle.getFile();
 		const writable = await toHandle.createWritable();
@@ -563,7 +546,7 @@ export class FastHfsImpl {
 		const destinationParent = await getDetails(
 			this.#workspaceId,
 			destinationPath.toString(),
-			{ create: true, kind: "directory" },
+			{ kind: "directory" },
 		);
 
 		const handleChromeError = async ex => {
@@ -616,7 +599,7 @@ export class FastHfsImpl {
 			const destinationParent = await getDetails(
 				this.#workspaceId,
 				destinationPath.toString(),
-				{ create: true, kind: "directory" },
+				{ kind: "directory" },
 			);
 
 			// @ts-ignore -- TS doesn't know about this yet
