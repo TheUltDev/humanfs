@@ -2,6 +2,7 @@
  * @fileoverview The main file for the hfs package.
  * @author MediaFire
  */
+
 /* global navigator */
 
 //-----------------------------------------------------------------------------
@@ -11,6 +12,7 @@
 /** @typedef{import("@humanfs/types").HfsImpl} HfsImpl */
 /** @typedef{import("fastio-types").FastFileList} FastFileList */
 /** @typedef{import("fastio-types").FastFileDetails} FastFileDetails */
+/** @typedef{import("wretch").Wretch} Wretch */
 
 //-----------------------------------------------------------------------------
 // Imports
@@ -30,90 +32,34 @@ import wretch from "wretch";
 // Helpers
 //-----------------------------------------------------------------------------
 
+const FASTIO_API = "https://api.fast.io/api/v1.0";
+
 /**
  * Finds a file or directory in the FastIO workspace.
- * @param {string} workspaceId The workspace to search.
- * @param {string} opaqueId The path to the file or directory to find.
- * @param {object} [options] The options for finding.
- * @param {"file"|"directory"} [options.kind] The kind of file or directory to find.
+ * @param {Wretch} api The FastIO API.
+ * @param {string} opaqueId The id of the file or directory.
  * @returns {Promise<FastFileDetails|undefined>} The file or directory found.
  */
-async function getDetails(
-	workspaceId,
-	opaqueId,
-	{ kind } = {},
-) {
-	// Special case: "root" targets the workspace root directory
-	if (opaqueId === "root") {
-		return workspaceId;
-	}
-
-	const path = Path.from(opaqueId);
-	const steps = [...path];
-
-	let handle = workspaceId;
-	let name = steps.shift();
-
-	while (handle && name) {
-		// `name` must represent a directory
-		if (steps.length > 0) {
-			try {
-				handle = await handle.getDirectoryHandle(name);
-			} catch {
-				return undefined;
-			}
-		} else {
-			if (!kind) {
-				try {
-					return await handle.getDirectoryHandle(name);
-				} catch {
-					try {
-						return await handle.getFileHandle(name);
-					} catch {
-						return undefined;
-					}
-				}
-			}
-
-			if (kind === "directory") {
-				try {
-					return await handle.getDirectoryHandle(name);
-				} catch {
-					return undefined;
-				}
-			}
-
-			if (kind === "file") {
-				try {
-					return await handle.getFileHandle(name);
-				} catch {
-					return undefined;
-				}
-			}
-		}
-
-		name = steps.shift();
-	}
-
-	return undefined;
+async function getDetails(api, opaqueId) {
+	// TODO: Implement this method
 }
 
 /**
  * Reads a file from the specified root.
- * @param {string} root The root directory to search.
- * @param {string} filePath The path to the file to read.
+ * @param {Wretch} api The FastIO API.
+ * @param {string} opaqueId The id of the file or directory.
  * @param {"text"|"arrayBuffer"} dataType The type of data to read.
- * @returns {Promise<string|ArrayBuffer|undefined>} The contents of the file or
- *   undefined if the file does not exist.
+ * @returns {Promise<string|ArrayBuffer|undefined>} Resolves with the
+ * 	contents of the file or undefined if the file does not exist.
  */
-async function readFile(root, filePath, dataType) {
-	const handle = await getDetails(root, filePath);
+async function readFile(api, opaqueId, dataType) {
+	const handle = await getDetails(api, opaqueId);
 
 	if (!handle || handle.kind !== "file") {
 		return undefined;
 	}
 
-	const fileHandle = /** @type {FileSystemFileHandle} */ (handle);
+	const fileHandle = /** @type {FastFileDetails} */ (handle);
 	const file = await fileHandle.getFile();
 
 	if (dataType === "arrayBuffer") {
@@ -128,69 +74,70 @@ async function readFile(root, filePath, dataType) {
 //-----------------------------------------------------------------------------
 
 /**
- * A class representing the Origin Private File System implementation of Hfs.
+ * A class representing the FastIO implementation of Hfs.
  * @implements {HfsImpl}
  */
 export class FastHfsImpl {
 	/**
-	 * The workspace to target.
-	 * @type {string}
+	 * The FastIO API.
+	 * @type {Wretch}
 	 */
-	#workspaceId;
+	#api;
 
 	/**
 	 * Creates a new instance.
 	 * @param {object} options The options for the instance.
+	 * @param {string} options.apiKey The API key for the account.
 	 * @param {string} options.workspaceId The workspace to target.
+	 * @throws {TypeError} If options.apiKey is not provided.
 	 * @throws {TypeError} If options.workspaceId is not provided.
 	 */
-	constructor({ workspaceId }) {
+	constructor({ apiKey, workspaceId }) {
+		if (!apiKey) {
+			throw new TypeError("options.apiKey is required");
+		}
+
 		if (!workspaceId) {
 			throw new TypeError("options.workspaceId is required");
 		}
 
-		this.#workspaceId = workspaceId;
+		this.#api = wretch(`${FASTIO_API}/workspace/${workspaceId}/storage`, { mode: "cors" })
+			.errorType("json")
+			.resolve(r => r.json())
 	}
 
 	/**
 	 * Reads a file and returns the contents as an Uint8Array.
-	 * @param {string} filePath The path to the file to read.
-	 * @returns {Promise<Uint8Array|undefined>} A promise that resolves with the contents
-	 *    of the file or undefined if the file does not exist.
+ 	 * @param {string} opaqueId The id of the file.
+	 * @returns {Promise<Uint8Array|undefined>} Resolves with the contents of the file
+	 * 	or undefined if the file does not exist.
 	 * @throws {Error} If the file cannot be read.
 	 * @throws {TypeError} If the file path is not a string.
 	 */
-	async bytes(filePath) {
+	async bytes(opaqueId) {
 		const buffer = /** @type {ArrayBuffer|undefined} */ (
-			await readFile(this.#workspaceId, filePath, "arrayBuffer")
+			await readFile(this.#api, opaqueId, "arrayBuffer")
 		);
 		return buffer ? new Uint8Array(buffer) : undefined;
 	}
 
 	/**
 	 * Writes a value to a file. If the value is a string, UTF-8 encoding is used.
-	 * @param {string} filePath The path to the file to write.
-	 * @param {Uint8Array} contents The contents to write to the
-	 *   file.
-	 * @returns {Promise<void>} A promise that resolves when the file is
-	 *  written.
+ 	 * @param {string} opaqueId The id of the file.
+	 * @param {Uint8Array} contents The contents to write to the file.
+	 * @returns {Promise<void>} Resolves when the file is written.
 	 * @throws {TypeError} If the file path is not a string.
 	 * @throws {Error} If the file cannot be written.
 	 */
-	async write(filePath, contents) {
-		let handle = /** @type {FileSystemFileHandle} */ (
-			await getDetails(this.#workspaceId, filePath)
+	async write(opaqueId, contents) {
+		let handle = /** @type {FastFileDetails} */ (
+			await getDetails(this.#api, opaqueId)
 		);
 
 		if (!handle) {
-			const path = Path.from(filePath);
+			const path = Path.from(opaqueId);
 			const name = path.name;
-			const parentHandle =
-				/** @type {string} */ (
-					await getDetails(this.#workspaceId, filePath, {
-						kind: "directory",
-					})
-				) ?? this.#workspaceId;
+			const parentHandle = await getDetails(this.#api, opaqueId);
 			handle = await parentHandle.getFileHandle(name, { create: true });
 		}
 
@@ -201,27 +148,25 @@ export class FastHfsImpl {
 
 	/**
 	 * Appends a value to a file. If the value is a string, UTF-8 encoding is used.
-	 * @param {string} filePath The path to the file to append to.
-	 * @param {Uint8Array} contents The contents to append to the
-	 *  file.
-	 * @returns {Promise<void>} A promise that resolves when the file is
-	 * written.
+ 	 * @param {string} opaqueId The id of the file.
+	 * @param {Uint8Array} contents The contents to append to the file.
+	 * @returns {Promise<void>} Resolves when the file is written.
 	 * @throws {TypeError} If the file path is not a string.
 	 * @throws {Error} If the file cannot be appended to.
 	 */
-	async append(filePath, contents) {
-		const handle = /** @type {FileSystemFileHandle} */ (
-			await getDetails(this.#workspaceId, filePath)
+	async append(opaqueId, contents) {
+		const handle = /** @type {FastFileDetails} */ (
+			await getDetails(this.#api, opaqueId)
 		);
 
-		// if there's no existing file, just write the contents
+		// If there's no existing file, just write the contents
 		if (!handle) {
-			return this.write(filePath, contents);
+			return this.write(opaqueId, contents);
 		}
 
-		// can't write to a directory
+		// Can't write to a directory
 		if (handle.kind !== "file") {
-			throw new DirectoryError(`append '${filePath}'`);
+			throw new DirectoryError(`append '${opaqueId}'`);
 		}
 
 		const existing = await (await handle.getFile()).arrayBuffer();
@@ -230,72 +175,60 @@ export class FastHfsImpl {
 			...contents,
 		]);
 
-		return this.write(filePath, newValue);
+		return this.write(opaqueId, newValue);
 	}
 
 	/**
 	 * Checks if a file exists.
-	 * @param {string} filePath The path to the file to check.
-	 * @returns {Promise<boolean>} A promise that resolves with true if the
-	 *    file exists or false if it does not.
+ 	 * @param {string} opaqueId The id of the file or directory.
+	 * @returns {Promise<boolean>} Resolves with true if the file exists
+	 * 	or false if it does not.
 	 * @throws {TypeError} If the file path is not a string.
 	 */
-	async isFile(filePath) {
-		const handle = await getDetails(this.#workspaceId, filePath);
+	async isFile(opaqueId) {
+		const handle = await getDetails(this.#api, opaqueId);
 		return !!(handle && handle.kind === "file");
 	}
 
 	/**
 	 * Checks if a directory exists.
-	 * @param {string} dirPath The path to the directory to check.
-	 * @returns {Promise<boolean>} A promise that resolves with true if the
-	 *    directory exists or false if it does not.
+ 	 * @param {string} opaqueId The id of the file or directory.
+	 * @returns {Promise<boolean>} Resolves with true if the directory exists
+	 * 	or false if it does not.
 	 * @throws {TypeError} If the directory path is not a string.
 	 */
-	async isDirectory(dirPath) {
-		const handle = await getDetails(this.#workspaceId, dirPath);
+	async isDirectory(opaqueId) {
+		const handle = await getDetails(this.#api, opaqueId);
 		return !!(handle && handle.kind === "directory");
 	}
 
 	/**
 	 * Creates a directory recursively.
-	 * @param {string} dirPath The path to the directory to create.
-	 * @returns {Promise<void>} A promise that resolves when the directory is
-	 *   created.
+ 	 * @param {string} opaqueId The parent directory id.
+	 * @returns {Promise<void>} Resolves when the directory is created.
 	 */
-	async createDirectory(dirPath) {
-		let handle = this.#workspaceId;
-		const path = Path.from(dirPath);
-
-		for (const name of path) {
-			handle = await handle.getDirectoryHandle(name, { create: true });
-		}
+	async createDirectory(opaqueId) {
+		// TODO: Implement this method
 	}
 
 	/**
 	 * Deletes a file or empty directory.
-	 * @param {string} opaqueId The path to the file or directory to
-	 *   delete.
-	 * @returns {Promise<void>} A promise that resolves when the file or
-	 *   directory is deleted.
+ 	 * @param {string} opaqueId The id of the file or directory.
+	 * @returns {Promise<void>} Resolves when the file or directory is deleted.
 	 * @throws {TypeError} If the file or directory path is not a string.
 	 * @throws {Error} If the file or directory cannot be deleted.
 	 * @throws {Error} If the file or directory is not found.
 	 */
 	async delete(opaqueId) {
-		const handle = await getDetails(this.#workspaceId, opaqueId);
-		const parentHandle =
-			/** @type {string} */ (
-				await getDetails(this.#workspaceId, opaqueId)
-			) ?? this.#workspaceId;
+		const handle = await getDetails(this.#api, opaqueId);
+		const parentHandle = await getDetails(this.#api, opaqueId);
 
 		if (!handle) {
 			throw new NotFoundError(`delete '${opaqueId}'`);
 		}
 
-		// nonempty directories must not be deleted
+		// Non-empty directories must not be deleted
 		if (handle.kind === "directory") {
-			// @ts-ignore -- TS doesn't know about this yet
 			const entries = handle.values();
 			const next = await entries.next();
 			if (!next.done) {
@@ -308,57 +241,30 @@ export class FastHfsImpl {
 
 	/**
 	 * Deletes a file or directory recursively.
-	 * @param {string} opaqueId The path to the file or directory to
-	 *   delete.
-	 * @returns {Promise<void>} A promise that resolves when the file or
-	 *   directory is deleted.
+ 	 * @param {string} opaqueId The id of the file or directory.
+	 * @returns {Promise<void>} Resolves when the file or directory is deleted.
 	 * @throws {TypeError} If the file or directory path is not a string.
 	 * @throws {Error} If the file or directory cannot be deleted.
 	 * @throws {Error} If the file or directory is not found.
 	 */
 	async deleteAll(opaqueId) {
-		const handle = await getDetails(this.#workspaceId, opaqueId);
+		const handle = await getDetails(this.#api, opaqueId);
 
 		if (!handle) {
 			throw new NotFoundError(`deleteAll '${opaqueId}'`);
 		}
-
-		/*
-		 * Note: For some reason, Chromium is not respecting the
-		 * `recursive` option on `string.removeEntry()`.
-		 * I've been unable to come up with a minimal repro case to demonstrate.
-		 * Need to investigate further.
-		 * https://bugs.chromium.org/p/chromium/issues/detail?id=1521975
-		 */
-
-		// @ts-ignore -- only supported by Chrome right now
-		if (handle.remove) {
-			// @ts-ignore -- only supported by Chrome right now
-			await handle.remove({ recursive: true });
-			return;
-		}
-
-		const parentHandle =
-			/** @type {string} */ (
-				await getDetails(this.#workspaceId, opaqueId)
-			) ?? this.#workspaceId;
-
-		if (!handle) {
-			throw new NotFoundError(`deleteAll '${opaqueId}'`);
-		}
-		parentHandle.removeEntry(handle.name, { recursive: true });
+	
+		await handle.remove({ recursive: true });
+		return;
 	}
 
 	/**
 	 * Returns a list of directory entries for the given path.
-	 * @param {string} dirPath The path to the directory to read.
-	 * @returns {AsyncIterable<FastFileList>} A promise that resolves with the
-	 *   directory entries.
+ 	 * @param {string} opaqueId The id of the file or directory.
+	 * @returns {AsyncIterable<FastFileList>} Resolves with the directory entries.
 	 */
-	async *list(dirPath) {
-		const handle = /** @type {string} */ (
-			await getDetails(this.#workspaceId, dirPath)
-		);
+	async *list(opaqueId) {
+		const handle = await getDetails(this.#api, opaqueId);
 
 		if (!handle) {
 			return;
@@ -380,38 +286,38 @@ export class FastHfsImpl {
 
 	/**
 	 * Returns the size of a file.
-	 * @param {string} filePath The path to the file to read.
-	 * @returns {Promise<number|undefined>} A promise that resolves with the size of the
-	 *  file in bytes or undefined if the file doesn't exist.
+ 	 * @param {string} opaqueId The id of the file or directory.
+	 * @returns {Promise<number|undefined>} Resolves with the size of the file in bytes
+	 * 	or undefined if the file doesn't exist.
 	 */
-	async size(filePath) {
-		const handle = await getDetails(this.#workspaceId, filePath);
+	async size(opaqueId) {
+		const handle = await getDetails(this.#api, opaqueId);
 
 		if (!handle || handle.kind !== "file") {
 			return undefined;
 		}
 
-		const fileHandle = /** @type {FileSystemFileHandle} */ (handle);
+		const fileHandle = /** @type {FastFileDetails} */ (handle);
 		const file = await fileHandle.getFile();
 		return file.size;
 	}
 
 	/**
-	 * Returns the last modified date of a file or directory. This method handles ENOENT errors
-	 * and returns undefined in that case.
-	 * @param {string} opaqueId The path to the file to read.
-	 * @returns {Promise<Date|undefined>} A promise that resolves with the last modified
-	 * date of the file or directory, or undefined if the file doesn't exist.
+	 * Returns the last modified date of a file or directory.
+	 * This method handles ENOENT errors and returns undefined in that case.
+	 * @param {string} opaqueId The id of the file or directory.
+	 * @returns {Promise<Date|undefined>} Resolves with the last modified
+	 * 	date of the file or directory, or undefined if the file doesn't exist.
 	 */
 	async lastModified(opaqueId) {
-		const handle = await getDetails(this.#workspaceId, opaqueId);
+		const handle = await getDetails(this.#api, opaqueId);
 
 		if (!handle) {
 			return undefined;
 		}
 
 		if (handle.kind === "file") {
-			const fileHandle = /** @type {FileSystemFileHandle} */ (handle);
+			const fileHandle = /** @type {FastFileDetails} */ (handle);
 			const file = await fileHandle.getFile();
 			return new Date(file.lastModified);
 		}
@@ -444,13 +350,13 @@ export class FastHfsImpl {
 
 	/**
 	 * Copies a file from one location to another.
-	 * @param {string} source The path to the file to copy.
-	 * @param {string} destination The path to the destination file.
-	 * @returns {Promise<void>} A promise that resolves when the file is copied.
+	 * @param {string} source The id to the file to copy.
+	 * @param {string} destination The id to the destination directory.
+	 * @returns {Promise<void>} Resolves when the file is copied.
 	 */
 	async copy(source, destination) {
-		const fromHandle = /** @type {FileSystemFileHandle } */ (
-			await getDetails(this.#workspaceId, source)
+		const fromHandle = /** @type {FastFileDetails} */ (
+			await getDetails(this.#api, source)
 		);
 
 		if (!fromHandle) {
@@ -465,8 +371,8 @@ export class FastHfsImpl {
 			throw new DirectoryError(`copy '${source}' -> '${destination}'`);
 		}
 
-		const toHandle = /** @type {FileSystemFileHandle } */ (
-			await getDetails(this.#workspaceId, destination, {kind: "file"})
+		const toHandle = /** @type {FastFileDetails} */ (
+			await getDetails(this.#api, destination)
 		);
 		const file = await fromHandle.getFile();
 		const writable = await toHandle.createWritable();
@@ -476,10 +382,9 @@ export class FastHfsImpl {
 
 	/**
 	 * Copies a file or directory from one location to another.
-	 * @param {string} source The path to the file or directory to copy.
-	 * @param {string} destination The path to copy the file or directory to.
-	 * @returns {Promise<void>} A promise that resolves when the file or directory is
-	 * copied.
+	 * @param {string} source The id of the file or directory to copy.
+	 * @param {string} destination The id of the destination directory.
+	 * @returns {Promise<void>} Resolves when the file or directory is copied.
 	 * @throws {Error} If the source file or directory does not exist.
 	 * @throws {Error} If the destination file or directory is a directory.
 	 */
@@ -522,15 +427,15 @@ export class FastHfsImpl {
 	}
 
 	/**
-	 * Moves a file from the source path to the destination path.
-	 * @param {string} source The location of the file to move.
-	 * @param {string} destination The destination of the file to move.
-	 * @returns {Promise<void>} A promise that resolves when the move is complete.
+	 * Moves a file from one location to another
+	 * @param {string} source The id of the file to move.
+	 * @param {string} destination The id of the destination directory.
+	 * @returns {Promise<void>} Resolves when the move is complete.
 	 * @throws {TypeError} If the file paths are not strings.
 	 * @throws {Error} If the file cannot be moved.
 	 */
 	async move(source, destination) {
-		const handle = await getDetails(this.#workspaceId, source);
+		const handle = await getDetails(this.#api, source);
 
 		if (!handle) {
 			throw new NotFoundError(`move '${source}' -> '${destination}'`);
@@ -540,14 +445,10 @@ export class FastHfsImpl {
 			throw new DirectoryError(`move '${source}' -> '${destination}'`);
 		}
 
-		const fileHandle = /** @type {FileSystemFileHandle} */ (handle);
+		const fileHandle = /** @type {FastFileDetails} */ (handle);
 		const destinationPath = Path.from(destination);
 		const destinationName = destinationPath.pop();
-		const destinationParent = await getDetails(
-			this.#workspaceId,
-			destinationPath.toString(),
-			{ kind: "directory" },
-		);
+		const destinationParent = await getDetails(this.#api, destinationPath.toString());
 
 		const handleChromeError = async ex => {
 			if (ex.name === "NotAllowedError") {
@@ -558,49 +459,39 @@ export class FastHfsImpl {
 			throw ex;
 		};
 
-		return (
-			fileHandle
-				// @ts-ignore -- TS doesn't know about this yet
-				.move(destinationParent, destinationName)
-				.catch(handleChromeError)
-		);
+		return fileHandle
+			.move(destinationParent, destinationName)
+			.catch(handleChromeError);
 	}
 
 	/**
 	 * Moves a file or directory from one location to another.
-	 * @param {string} source The path to the file or directory to move.
-	 * @param {string} destination The path to move the file or directory to.
-	 * @returns {Promise<void>} A promise that resolves when the file or directory is
-	 * moved.
+	 * @param {string} source The id of the file or directory to move.
+	 * @param {string} destination The of to the destination directory.
+	 * @returns {Promise<void>} Resolves when the file or directory is moved.
 	 * @throws {Error} If the source file or directory does not exist.
 	 */
 	async moveAll(source, destination) {
-		const handle = await getDetails(this.#workspaceId, source);
+		const handle = await getDetails(this.#api, source);
 
-		// if the source doesn't exist then throw an error
+		// If the source doesn't exist then throw an error
 		if (!handle) {
 			throw new NotFoundError(`moveAll '${source}' -> '${destination}'`);
 		}
 
-		// for files use move() and exit
+		// For files use move() and exit
 		if (handle.kind === "file") {
 			return this.move(source, destination);
 		}
 
-		const directoryHandle = /** @type {string} */ (
-			handle
-		);
+		const directoryHandle = /** @type {string} */ (handle);
 		const destinationPath = Path.from(destination);
 
 		// Chrome doesn't yet support move() on directories
 		// @ts-ignore -- TS doesn't know about this yet
 		if (directoryHandle.move) {
 			const destinationName = destinationPath.pop();
-			const destinationParent = await getDetails(
-				this.#workspaceId,
-				destinationPath.toString(),
-				{ kind: "directory" },
-			);
+			const destinationParent = await getDetails(this.#api, destinationPath.toString());
 
 			// @ts-ignore -- TS doesn't know about this yet
 			return directoryHandle.move(destinationParent, destinationName);
@@ -643,13 +534,10 @@ export class FastHfs extends Hfs {
 	/**
 	 * Creates a new instance.
 	 * @param {object} options The options for the instance.
+	 * @param {string} options.apiKey The API key for the account.
 	 * @param {string} options.workspaceId The workspace to target.
 	 */
-	constructor({ workspaceId }) {
-		super({ impl: new FastHfsImpl({ workspaceId }) });
+	constructor({ apiKey, workspaceId }) {
+		super({ impl: new FastHfsImpl({ apiKey, workspaceId }) });
 	}
 }
-
-export const hfs = new FastHfs({
-	workspaceId: '4696910076313161000'
-});

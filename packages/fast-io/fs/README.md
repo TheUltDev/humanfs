@@ -1,124 +1,101 @@
 # `fastio-fs`
 
-by [MediaFire](https://mediafire.com)
-
-If you find this useful, please consider supporting [Nicholas C. Zakas](https://humanwhocodes.com) with a [donation](https://humanwhocodes.com/donate) or [nominate him](https://stars.github.com/nominate/) for a GitHub Star.
-
-## Description
-
 The humanfs bindings for the [Fast.io](https://fast.io) collaborative cloud storage provider.
 
-> [!WARNING]
-> This project is **experimental** and may change significantly before v1.0.0. Use at your own caution and definitely not in production!
+> If you find this useful, please consider supporting the [humanfs](https://github.com/humanwhocodes/humanfs) project by [Nicholas C. Zakas](https://humanwhocodes.com) with a [donation](https://humanwhocodes.com/donate) or [nominate him](https://stars.github.com/nominate/) for a GitHub Star.
 
 ## Installation
 
-It's recommended to import the minified version to save bandwidth:
-
-```js
-import { hfs } from "https://cdn.skypack.dev/fastio-fs?min";
-```
-
-However, you can also import the unminified version for debugging purposes:
-
-```js
-import { hfs } from "https://cdn.skypack.dev/fastio-fs";
+```sh
+npm i fast-fs
 ```
 
 ## Usage
 
-The easiest way to use hfs in your project is to import the `hfs` object:
-
-```js
-import { hfs } from "fastio-fs";
-```
-
-Then, you can use the API methods:
-
-```js
-// 1. Files
-
-// read from a text file
-const text = await hfs.text("file.txt");
-
-// read from a JSON file
-const json = await hfs.json("file.json");
-
-// read raw bytes from a text file
-const bytes = await hfs.bytes("file.txt");
-
-// write text to a file
-await hfs.write("file.txt", "Hello world!");
-
-// write bytes to a file
-await hfs.write("file.txt", new TextEncoder().encode("Hello world!"));
-
-// append text to a file
-await hfs.append("file.txt", "Hello world!");
-
-// append bytes to a file
-await hfs.append("file.txt", new TextEncoder().encode("Hello world!"));
-
-// does the file exist?
-const found = await hfs.isFile("file.txt");
-
-// how big is the file?
-const size = await hfs.size("file.txt");
-
-// when was the file modified?
-const mtime = await hfs.lastModified("file.txt");
-
-// copy a file from one location to another
-await hfs.copy("file.txt", "file-copy.txt");
-
-// move a file from one location to another
-await hfs.move("file.txt", "renamed.txt");
-
-// delete a file
-await hfs.delete("file.txt");
-
-// 2. Directories
-
-// create a directory
-await hfs.createDirectory("dir");
-
-// create a directory recursively
-await hfs.createDirectory("dir/subdir");
-
-// does the directory exist?
-const dirFound = await hfs.isDirectory("dir");
-
-// copy the entire directory
-hfs.copyAll("from-dir", "to-dir");
-
-// move the entire directory
-hfs.moveAll("from-dir", "to-dir");
-
-// delete a directory
-await hfs.delete("dir");
-
-// delete a non-empty directory
-await hfs.deleteAll("dir");
-```
-
-If you'd like to create your own instance, import the `FastHfs` constructor:
+1. Import the `FastHfs` constructor:
 
 ```js
 import { FastHfs } from "fastio-fs";
+```
+2. Create the instance using your [API Key](https://docs.fast.io/reference/post-create-api-key) and [Workspace ID](https://docs.fast.io/reference/organization-details-copy):
 
+```js
 const hfs = new FastHfs({
-	workspaceId: '4696910076313161000'
+	apiKey: "yffaenajzny66mrdiuk6s6dvk6ef2gq7ia72",
+	workspaceId: "4696910076313161000"
 });
 ```
 
-If you'd like to use just the impl, import the `FastHfsImpl` constructor:
+3. Now you can use the [Storage API](https://docs.fast.io/reference/storage-endpoint-details) methods:
 
 ```js
-import { FastHfsImpl } from "fastio-fs";
+// --------------------------------------------------------------------
+// FILES
+// --------------------------------------------------------------------
 
-const hfs = new FastHfsImpl({
-	workspaceId: '4696910076313161000'
-});
+// Read from a text file
+const text = await hfs.text("file.txt");
+
+// Read from a JSON file
+const json = await hfs.json("file.json");
+
+// Read raw bytes from a text file
+const bytes = await hfs.bytes("file.txt");
+
+// Write text to a file
+await hfs.write("file.txt", "Hello world!");
+
+// Write bytes to a file
+await hfs.write("file.txt", new TextEncoder().encode("Hello world!"));
+
+// Append text to a file
+await hfs.append("file.txt", "Hello world!");
+
+// Append bytes to a file
+await hfs.append("file.txt", new TextEncoder().encode("Hello world!"));
+
+// Does the file exist?
+const found = await hfs.isFile("file.txt");
+
+// How big is the file?
+const size = await hfs.size("file.txt");
+
+// When was the file modified?
+const mtime = await hfs.lastModified("file.txt");
+
+// Copy a file from one location to another
+await hfs.copy("file.txt", "file-copy.txt");
+
+// Move a file from one location to another
+await hfs.move("file.txt", "renamed.txt");
+
+// Delete a file
+await hfs.delete("file.txt");
+
+// --------------------------------------------------------------------
+// DIRECTORIES
+// --------------------------------------------------------------------
+
+// Create a directory
+await hfs.createDirectory("dir");
+
+// Create a directory recursively
+await hfs.createDirectory("dir/subdir");
+
+// Does the directory exist?
+const dirFound = await hfs.isDirectory("dir");
+
+// Copy the entire directory
+hfs.copyAll("from-dir", "to-dir");
+
+// Move the entire directory
+hfs.moveAll("from-dir", "to-dir");
+
+// Delete a directory
+await hfs.delete("dir");
+
+// Delete a non-empty directory
+await hfs.deleteAll("dir");
 ```
 
 ## License

@@ -4,12 +4,25 @@
  */
 
 //------------------------------------------------------------------------------
+// FastFileList
+//------------------------------------------------------------------------------
+
+export interface FastFileList {
+	/** True if the list was retrieved successfully. */
+	result: boolean;
+	/** The number of records retrieved during the operation. */
+	results: number;
+	/** The list of files. */
+	list: FastFileDetails[];
+}
+
+//------------------------------------------------------------------------------
 // FastFileDetails
 //------------------------------------------------------------------------------
 
 export interface FastFileDetails {
-	/** The id of the file. */
-	id: boolean;
+	/** The opaque id of the file. */
+	id: string;
 	/** The type of the file. */
 	type: 'file' | 'folder';
 	/** The name of the file. */
@@ -46,34 +59,4 @@ export interface FastFileDetails {
 	keyvalue: object[];
 	/** The users the file is shared with. */
 	share: string[];
-}
-
-//------------------------------------------------------------------------------
-// FastFileList
-//------------------------------------------------------------------------------
-
-export interface FastFileList {
-	/** True if the list was retrieved successfully. */
-	result: boolean;
-	/** The number of records retrieved during the operation. */
-	results: number;
-	/** The list of files. */
-	list: FastFileDetails[];
-}
-
-//------------------------------------------------------------------------------
-// FastFileDetails
-//------------------------------------------------------------------------------
-
-export interface FastFileDetails {
-	/** The id of the file. */
-	id: boolean;
-	/** The type of the file. */
-	type: 'file' | 'folder';
-	/** The name of the file. */
-	name: string;
-	/** The size of the file in bytes. */
-	size: number;
-	/** The MIME type of the file. */
-	mimetype: string;
 }
